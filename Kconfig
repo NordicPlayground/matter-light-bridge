@@ -4,12 +4,12 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
-source "Kconfig.zephyr"
-
-menu "Matter Bridge"
+mainmenu "Matter Bridge sample application"
 
 config ZIGBEE_SHELL_DEVICE_NAME
 	string "UART device name for Zigbee shell"
 	default "UART_1"
 
-endmenu
+source "${ZEPHYR_BASE}/../modules/lib/matter/config/nrfconnect/chip-module/Kconfig.features"
+source "${ZEPHYR_BASE}/../modules/lib/matter/config/nrfconnect/chip-module/Kconfig.defaults"
+source "Kconfig.zephyr"

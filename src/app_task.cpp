@@ -9,15 +9,18 @@
 #include "zigbee_shell.h"
 #include "Device.h"
 
+#include <app-common/zap-generated/af-structs.h>
+#include <app-common/zap-generated/attribute-id.h>
+#include <app-common/zap-generated/cluster-id.h>
+
 #include <platform/CHIPDeviceLayer.h>
 
 #include <app/server/OnboardingCodesUtil.h>
 #include <app/server/Server.h>
+#include <app/util/attribute-storage.h>
 #include <credentials/DeviceAttestationCredsProvider.h>
 #include <credentials/examples/DeviceAttestationCredsExample.h>
-#include <app-common/zap-generated/af-structs.h>
-#include <app-common/zap-generated/attribute-id.h>
-#include <app-common/zap-generated/cluster-id.h>
+
 #include <app/reporting/reporting.h>
 #include <vector>
 
@@ -61,9 +64,15 @@ static Device * gDevices[CHIP_DEVICE_CONFIG_DYNAMIC_ENDPOINT_COUNT]; // number o
 std::vector<Device> Lights(CHIP_DEVICE_CONFIG_DYNAMIC_ENDPOINT_COUNT, Device());
 
 // (taken from chip-devices.xml)
-#define DEVICE_TYPE_CHIP_BRIDGE 0x0a0b
+#define DEVICE_TYPE_BRIDGED_NODE 0x0013
 // (taken from lo-devices.xml)
 #define DEVICE_TYPE_LO_ON_OFF_LIGHT 0x0100
+
+// (taken from chip-devices.xml)
+#define DEVICE_TYPE_ROOT_NODE 0x0016
+// (taken from chip-devices.xml)
+#define DEVICE_TYPE_BRIDGE 0x000e
+
 // Device Version for dynamic endpoints:
 #define DEVICE_VERSION_DEFAULT 1
 
@@ -99,10 +108,23 @@ DECLARE_DYNAMIC_ATTRIBUTE(ZCL_LABEL_LIST_ATTRIBUTE_ID, ARRAY, kFixedLabelAttribu
 	DECLARE_DYNAMIC_ATTRIBUTE_LIST_END();
 
 // Declare Cluster List for Bridged Light endpoint
+// TODO: It's not clear whether it would be better to get the command lists from
+// the ZAP config on our last fixed endpoint instead.
+constexpr CommandId onOffIncomingCommands[] = {
+    app::Clusters::OnOff::Commands::Off::Id,
+    app::Clusters::OnOff::Commands::On::Id,
+    app::Clusters::OnOff::Commands::Toggle::Id,
+    app::Clusters::OnOff::Commands::OffWithEffect::Id,
+    app::Clusters::OnOff::Commands::OnWithRecallGlobalScene::Id,
+    app::Clusters::OnOff::Commands::OnWithTimedOff::Id,
+    kInvalidCommandId,
+};
+
 DECLARE_DYNAMIC_CLUSTER_LIST_BEGIN(bridgedLightClusters)
-DECLARE_DYNAMIC_CLUSTER(ZCL_ON_OFF_CLUSTER_ID, onOffAttrs), DECLARE_DYNAMIC_CLUSTER(ZCL_DESCRIPTOR_CLUSTER_ID, descriptorAttrs),
-	DECLARE_DYNAMIC_CLUSTER(ZCL_BRIDGED_DEVICE_BASIC_CLUSTER_ID, bridgedDeviceBasicAttrs),
-	DECLARE_DYNAMIC_CLUSTER(ZCL_FIXED_LABEL_CLUSTER_ID, fixedLabelAttrs) DECLARE_DYNAMIC_CLUSTER_LIST_END;
+DECLARE_DYNAMIC_CLUSTER(ZCL_ON_OFF_CLUSTER_ID, onOffAttrs, onOffIncomingCommands, nullptr),
+	DECLARE_DYNAMIC_CLUSTER(ZCL_DESCRIPTOR_CLUSTER_ID, descriptorAttrs, nullptr, nullptr),
+	DECLARE_DYNAMIC_CLUSTER(ZCL_BRIDGED_DEVICE_BASIC_CLUSTER_ID, bridgedDeviceBasicAttrs, nullptr, nullptr),
+	DECLARE_DYNAMIC_CLUSTER(ZCL_FIXED_LABEL_CLUSTER_ID, fixedLabelAttrs, nullptr, nullptr), DECLARE_DYNAMIC_CLUSTER_LIST_END;
 
 // Declare Bridged Light endpoint
 DECLARE_DYNAMIC_ENDPOINT(bridgedLightEndpoint, bridgedLightClusters);
@@ -124,33 +146,43 @@ k_timer sFunctionTimer;
 
 AppTask AppTask::sAppTask;
 
-CHIP_ERROR AddDeviceEndpoint(Device * dev, EmberAfEndpointType * ep, uint16_t deviceType)
+DataVersion gLightDataVersions[ArraySize(bridgedLightClusters)];
+
+int AddDeviceEndpoint(Device * dev, EmberAfEndpointType * ep, const Span<const EmberAfDeviceType> & deviceTypeList,
+                      const Span<DataVersion> & dataVersionStorage)
 {
-	uint8_t index = 0;
-	while (index < CHIP_DEVICE_CONFIG_DYNAMIC_ENDPOINT_COUNT)
-	{
-		if (NULL == gDevices[index])
-		{
-			gDevices[index] = dev;
-			EmberAfStatus ret;
-			ret = emberAfSetDynamicEndpoint(index, gCurrentEndpointId, ep, deviceType, DEVICE_VERSION_DEFAULT);
-			if (ret == EMBER_ZCL_STATUS_SUCCESS)
-			{
-				ChipLogProgress(DeviceLayer, "Added device %s to dynamic endpoint %d (index=%d)", dev->GetName(),
-						gCurrentEndpointId, index);
-				gCurrentEndpointId++;
-				return CHIP_NO_ERROR;
-			}
-			else if (ret != EMBER_ZCL_STATUS_DUPLICATE_EXISTS)
-			{
-				ChipLogProgress(DeviceLayer, "Failed to add dynamic endpoint, Insufficient space");
-				return CHIP_ERROR_INTERNAL;
-			}
-		}
-		index++;
-	}
-	ChipLogProgress(DeviceLayer, "Failed to add dynamic endpoint: No endpoints available!");
-	return CHIP_ERROR_INTERNAL;
+    uint8_t index = 0;
+    while (index < CHIP_DEVICE_CONFIG_DYNAMIC_ENDPOINT_COUNT)
+    {
+        if (NULL == gDevices[index])
+        {
+            gDevices[index] = dev;
+            EmberAfStatus ret;
+            while (1)
+            {
+                dev->SetEndpointId(gCurrentEndpointId);
+                ret = emberAfSetDynamicEndpoint(index, gCurrentEndpointId, ep, dataVersionStorage, deviceTypeList);
+                if (ret == EMBER_ZCL_STATUS_SUCCESS)
+                {
+                    ChipLogProgress(DeviceLayer, "Added device %s to dynamic endpoint %d (index=%d)", dev->GetName(),
+                                    gCurrentEndpointId, index);
+                    return index;
+                }
+                else if (ret != EMBER_ZCL_STATUS_DUPLICATE_EXISTS)
+                {
+                    return -1;
+                }
+                // Handle wrap condition
+                if (++gCurrentEndpointId < gFirstDynamicEndpointId)
+                {
+                    gCurrentEndpointId = gFirstDynamicEndpointId;
+                }
+            }
+        }
+        index++;
+    }
+    ChipLogProgress(DeviceLayer, "Failed to add dynamic endpoint: No endpoints available!");
+	return -1;
 }
 
 CHIP_ERROR RemoveDeviceEndpoint(Device * dev)
@@ -319,15 +351,14 @@ void HandleDeviceStatusChanged(Device * dev, Device::Changed_t itemChangedMask)
 	{
 		uint8_t reachable = dev->IsReachable() ? 1 : 0;
 		MatterReportingAttributeChangeCallback(dev->GetEndpointId(), ZCL_BRIDGED_DEVICE_BASIC_CLUSTER_ID,
-						       ZCL_REACHABLE_ATTRIBUTE_ID, CLUSTER_MASK_SERVER, ZCL_BOOLEAN_ATTRIBUTE_TYPE,
-						       &reachable);
+						       ZCL_REACHABLE_ATTRIBUTE_ID, ZCL_BOOLEAN_ATTRIBUTE_TYPE, &reachable);
 	}
 
 	if (itemChangedMask & Device::kChanged_State)
 	{
 		uint8_t isOn = dev->IsOn() ? 1 : 0;
 		MatterReportingAttributeChangeCallback(dev->GetEndpointId(), ZCL_ON_OFF_CLUSTER_ID, ZCL_ON_OFF_ATTRIBUTE_ID,
-						       CLUSTER_MASK_SERVER, ZCL_BOOLEAN_ATTRIBUTE_TYPE, &isOn);
+						       ZCL_BOOLEAN_ATTRIBUTE_TYPE, &isOn);
 	}
 
 	if (itemChangedMask & Device::kChanged_Name)
@@ -335,8 +366,7 @@ void HandleDeviceStatusChanged(Device * dev, Device::Changed_t itemChangedMask)
 		uint8_t zclName[kNodeLabelSize + 1];
 		ToZclCharString(zclName, dev->GetName(), kNodeLabelSize);
 		MatterReportingAttributeChangeCallback(dev->GetEndpointId(), ZCL_BRIDGED_DEVICE_BASIC_CLUSTER_ID,
-						       ZCL_NODE_LABEL_ATTRIBUTE_ID, CLUSTER_MASK_SERVER, ZCL_CHAR_STRING_ATTRIBUTE_TYPE,
-						       zclName);
+						       ZCL_NODE_LABEL_ATTRIBUTE_ID, ZCL_CHAR_STRING_ATTRIBUTE_TYPE, zclName);
 	}
 	if (itemChangedMask & Device::kChanged_Location)
 	{
@@ -348,9 +378,15 @@ void HandleDeviceStatusChanged(Device * dev, Device::Changed_t itemChangedMask)
 		EncodeFixedLabel("room", dev->GetLocation(), buffer, sizeof(buffer), &am);
 
 		MatterReportingAttributeChangeCallback(dev->GetEndpointId(), ZCL_FIXED_LABEL_CLUSTER_ID, ZCL_LABEL_LIST_ATTRIBUTE_ID,
-						       CLUSTER_MASK_SERVER, ZCL_ARRAY_ATTRIBUTE_TYPE, buffer);
+						       ZCL_ARRAY_ATTRIBUTE_TYPE, buffer);
 	}
 }
+
+const EmberAfDeviceType gBridgedRootDeviceTypes[] = { { DEVICE_TYPE_ROOT_NODE, DEVICE_VERSION_DEFAULT },
+                                                      { DEVICE_TYPE_BRIDGE, DEVICE_VERSION_DEFAULT } };
+
+const EmberAfDeviceType gBridgedOnOffDeviceTypes[] = { { DEVICE_TYPE_LO_ON_OFF_LIGHT, DEVICE_VERSION_DEFAULT },
+                                                       { DEVICE_TYPE_BRIDGED_NODE, DEVICE_VERSION_DEFAULT } };
 
 int AppTask::Init()
 {
@@ -395,7 +431,9 @@ int AppTask::Init()
 	k_timer_user_data_set(&sFunctionTimer, this);
 
 	/* Init ZCL Data Model and start server */
-	chip::Server::GetInstance().Init();
+	static chip::CommonCaseDeviceServerInitParams initParams;
+	(void) initParams.InitializeStaticResourcesBeforeServerInit();
+	chip::Server::GetInstance().Init(initParams);
 
 	/* Initialize device attestation config */
 	SetDeviceAttestationCredentialsProvider(Examples::GetExampleDACProvider());
@@ -620,7 +658,9 @@ void AppTask::ZigbeeEventHandler(ZigbeeShell * shell, ZigbeeShell::Event_t event
 		for (auto &light : Lights)
 		{
 			if (!strcmp(light.GetName(), "none")) {
-				AddDeviceEndpoint(&light, &bridgedLightEndpoint, DEVICE_TYPE_LO_ON_OFF_LIGHT);
+				AddDeviceEndpoint(&light, &bridgedLightEndpoint,
+					Span<const EmberAfDeviceType>(gBridgedOnOffDeviceTypes),
+                    Span<DataVersion>(gLightDataVersions));
 				light.SetName("Light");
 				light.SetZbAddr(shell->mEvent.Zdo.addr);
 				light.SetZbEp(shell->mEvent.Zdo.ep);
