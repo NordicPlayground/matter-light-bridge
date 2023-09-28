@@ -19,7 +19,41 @@
 
 #pragma once
 
-#include <app-common/zap-generated/callbacks/PluginCallbacks.h>
+void MatterIdentifyPluginServerInitCallback();
+void MatterOnOffPluginServerInitCallback();
+void MatterLevelControlPluginServerInitCallback();
+void MatterDescriptorPluginServerInitCallback();
+void MatterAccessControlPluginServerInitCallback();
+void MatterBasicInformationPluginServerInitCallback();
+void MatterOtaSoftwareUpdateRequestorPluginServerInitCallback();
+void MatterGeneralCommissioningPluginServerInitCallback();
+void MatterNetworkCommissioningPluginServerInitCallback();
+void MatterGeneralDiagnosticsPluginServerInitCallback();
+void MatterSoftwareDiagnosticsPluginServerInitCallback();
+void MatterThreadNetworkDiagnosticsPluginServerInitCallback();
+void MatterSwitchPluginServerInitCallback();
+void MatterAdministratorCommissioningPluginServerInitCallback();
+void MatterOperationalCredentialsPluginServerInitCallback();
+void MatterGroupKeyManagementPluginServerInitCallback();
+void MatterFixedLabelPluginServerInitCallback();
+void MatterUserLabelPluginServerInitCallback();
 
-#define MATTER_PLUGINS_INIT MatterAccessControlPluginServerInitCallback(); MatterAdministratorCommissioningPluginServerInitCallback(); MatterBasicPluginServerInitCallback(); MatterDescriptorPluginServerInitCallback(); MatterDiagnosticLogsPluginServerInitCallback(); MatterFixedLabelPluginServerInitCallback(); MatterGeneralCommissioningPluginServerInitCallback(); MatterGeneralDiagnosticsPluginServerInitCallback(); MatterIdentifyPluginServerInitCallback(); MatterLevelControlPluginServerInitCallback(); MatterLocalizationConfigurationPluginServerInitCallback(); MatterNetworkCommissioningPluginServerInitCallback(); MatterOtaSoftwareUpdateProviderPluginClientInitCallback(); MatterOtaSoftwareUpdateRequestorPluginServerInitCallback(); MatterOnOffPluginServerInitCallback(); MatterOperationalCredentialsPluginServerInitCallback(); MatterSoftwareDiagnosticsPluginServerInitCallback(); MatterSwitchPluginServerInitCallback(); MatterThreadNetworkDiagnosticsPluginServerInitCallback(); MatterTimeFormatLocalizationPluginServerInitCallback(); MatterUserLabelPluginServerInitCallback(); 
-
+#define MATTER_PLUGINS_INIT                                                                                            \
+	MatterIdentifyPluginServerInitCallback();                                                                      \
+	MatterOnOffPluginServerInitCallback();                                                                         \
+	MatterLevelControlPluginServerInitCallback();                                                                  \
+	MatterDescriptorPluginServerInitCallback();                                                                    \
+	MatterAccessControlPluginServerInitCallback();                                                                 \
+	MatterBasicInformationPluginServerInitCallback();                                                              \
+	MatterOtaSoftwareUpdateRequestorPluginServerInitCallback();                                                    \
+	MatterGeneralCommissioningPluginServerInitCallback();                                                          \
+	MatterNetworkCommissioningPluginServerInitCallback();                                                          \
+	MatterGeneralDiagnosticsPluginServerInitCallback();                                                            \
+	MatterSoftwareDiagnosticsPluginServerInitCallback();                                                           \
+	MatterThreadNetworkDiagnosticsPluginServerInitCallback();                                                      \
+	MatterSwitchPluginServerInitCallback();                                                                        \
+	MatterAdministratorCommissioningPluginServerInitCallback();                                                    \
+	MatterOperationalCredentialsPluginServerInitCallback();                                                        \
+	MatterGroupKeyManagementPluginServerInitCallback();                                                            \
+	MatterFixedLabelPluginServerInitCallback();                                                                    \
+	MatterUserLabelPluginServerInitCallback();

@@ -7,8 +7,8 @@
 #pragma once
 
 #include <functional>
-#include <zephyr.h>
-#include <sys/ring_buffer.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/ring_buffer.h>
 
 #define ZB_SHELL_MSG_PROMPT "uart:~$"
 #define ZB_SHELL_MSG_CMD_DONE "Done"
