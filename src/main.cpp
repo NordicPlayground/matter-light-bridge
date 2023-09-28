@@ -6,7 +6,7 @@
 
 #include "app_task.h"
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 
 #include <lib/support/CHIPMem.h>
 #include <platform/CHIPDeviceLayer.h>

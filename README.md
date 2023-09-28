@@ -12,7 +12,7 @@ The Matter device(nRF5340) that runs the lighting bridge application is connecte
 
 ## Build the example
 
-1. This example is based on nRF Conenct SDK **v1.9.0**. Before building the example, install the NCS v1.9.0 first. See [Getting Started](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/1.9.0/nrf/getting_started.html) for more information.
+1. This example is based on nRF Connect SDK **v2.4.0**. Before building the example, install the NCS v1.9.0 first. See [Getting Started](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/2.4.0/nrf/getting_started.html) for more information.
 
 2. Clone the example to nrf/samples/matter/bridge:
 

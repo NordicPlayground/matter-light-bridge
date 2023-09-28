@@ -5,8 +5,8 @@
  */
 
 #include "zigbee_shell.h"
-#include <logging/log.h>
-#include <drivers/uart.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/drivers/uart.h>
 
 LOG_MODULE_DECLARE(zigbee_shell);
 

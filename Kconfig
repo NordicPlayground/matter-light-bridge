@@ -3,13 +3,25 @@
 #
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
+mainmenu "Matter Bridge sample application"
 
-source "Kconfig.zephyr"
+# Sample configuration used for Thread networking
+if NET_L2_OPENTHREAD
 
-menu "Matter Bridge"
+choice OPENTHREAD_NORDIC_LIBRARY_CONFIGURATION
+	default OPENTHREAD_NORDIC_LIBRARY_FTD
+endchoice
+
+choice OPENTHREAD_DEVICE_TYPE
+	default OPENTHREAD_FTD
+endchoice
+
+endif # NET_L2_OPENTHREAD
 
 config ZIGBEE_SHELL_DEVICE_NAME
 	string "UART device name for Zigbee shell"
 	default "UART_1"
 
-endmenu
+source "${ZEPHYR_BASE}/../modules/lib/matter/config/nrfconnect/chip-module/Kconfig.features"
+source "${ZEPHYR_BASE}/../modules/lib/matter/config/nrfconnect/chip-module/Kconfig.defaults"
+source "Kconfig.zephyr"
