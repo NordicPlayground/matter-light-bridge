@@ -3,8 +3,20 @@
 #
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
-
 mainmenu "Matter Bridge sample application"
+
+# Sample configuration used for Thread networking
+if NET_L2_OPENTHREAD
+
+choice OPENTHREAD_NORDIC_LIBRARY_CONFIGURATION
+	default OPENTHREAD_NORDIC_LIBRARY_FTD
+endchoice
+
+choice OPENTHREAD_DEVICE_TYPE
+	default OPENTHREAD_FTD
+endchoice
+
+endif # NET_L2_OPENTHREAD
 
 config ZIGBEE_SHELL_DEVICE_NAME
 	string "UART device name for Zigbee shell"
