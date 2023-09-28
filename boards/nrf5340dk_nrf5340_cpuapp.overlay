@@ -64,6 +64,4 @@
 /* Used to talk to the Zigbee board */
 &uart1 {
 	status = "okay";
-	// tx-pin = <34>;
-	// rx-pin = <35>;
 };
