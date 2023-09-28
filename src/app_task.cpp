@@ -181,7 +181,7 @@ int AddDeviceEndpoint(Device * dev, EmberAfEndpointType * ep, const Span<const E
         }
         index++;
     }
-    ChipLogProgress(DeviceLayer, "Failed to add dynamic endpoint: No endpoints available!");
+    ChipLogError(DeviceLayer, "Failed to add dynamic endpoint: No endpoints available!");
 	return -1;
 }
 
@@ -658,14 +658,17 @@ void AppTask::ZigbeeEventHandler(ZigbeeShell * shell, ZigbeeShell::Event_t event
 		for (auto &light : Lights)
 		{
 			if (!strcmp(light.GetName(), "none")) {
-				AddDeviceEndpoint(&light, &bridgedLightEndpoint,
+				if (AddDeviceEndpoint(&light, &bridgedLightEndpoint,
 					Span<const EmberAfDeviceType>(gBridgedOnOffDeviceTypes),
-                    Span<DataVersion>(gLightDataVersions));
-				light.SetName("Light");
-				light.SetZbAddr(shell->mEvent.Zdo.addr);
-				light.SetZbEp(shell->mEvent.Zdo.ep);
-				light.SetReachable(true);
-				GetAppTask().PostEvent(AppEvent{ AppEvent::SimpleDescRsp, shell->mEvent.Zdo});
+                    Span<DataVersion>(gLightDataVersions)) == 0) {
+					light.SetName("Light");
+					light.SetZbAddr(shell->mEvent.Zdo.addr);
+					light.SetZbEp(shell->mEvent.Zdo.ep);
+					light.SetReachable(true);
+					GetAppTask().PostEvent(AppEvent{ AppEvent::SimpleDescRsp, shell->mEvent.Zdo});
+				} else {
+					LOG_ERR("Zigbee event: %d", event);
+				}
 				break;
 			}
 		}
